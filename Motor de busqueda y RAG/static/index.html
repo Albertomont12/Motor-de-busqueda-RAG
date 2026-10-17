@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Motor de Búsqueda y RAG</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: #f4f6fb; font-synthesis: none; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header { background: #111827; color: white; padding: 27px max(24px, calc((100vw - 1120px)/2)); }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: #6d5efc; font-size: 22px; }
+    h1 { margin: 0; font-size: 21px; letter-spacing: -.35px; }
+    header p { margin: 5px 0 0; color: #aeb8cc; font-size: 13px; }
+    main { max-width: 1120px; margin: 32px auto; padding: 0 24px 40px; display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 22px; align-items: start; }
+    .card { background: white; border: 1px solid #e4e8f0; border-radius: 15px; box-shadow: 0 6px 24px #1f29370a; }
+    .panel { padding: 22px; }
+    h2 { margin: 0; font-size: 16px; }
+    .subheading { color: #768198; font-size: 13px; line-height: 1.55; margin: 8px 0 18px; }
+    .drop-zone { display: block; text-align: center; border: 1.5px dashed #cbd2e1; border-radius: 12px; padding: 22px 14px; background: #fafbfe; cursor: pointer; transition: border-color .15s, background .15s; }
+    .drop-zone:hover, .drop-zone.dragover { border-color: #6d5efc; background: #f6f5ff; }
+    .upload-icon { color: #6d5efc; font-size: 25px; display: block; margin-bottom: 8px; }
+    .drop-zone strong { display: block; font-size: 13px; }
+    .drop-zone span { display: block; color: #8791a6; font-size: 12px; margin-top: 5px; }
+    input[type=file] { display: none; }
+    .doc-heading { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 11px; }
+    .doc-heading h3 { font-size: 13px; margin: 0; }
+    .count { color: #7b8497; font-size: 12px; }
+    .documents { display: grid; gap: 8px; }
+    .document { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #edf0f5; border-radius: 10px; min-width: 0; }
+    .file-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 9px; color: #6254ed; background: #f1efff; font-size: 11px; font-weight: 700; }
+    .doc-info { min-width: 0; flex: 1; }
+    .doc-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-meta { font-size: 11px; color: #8992a5; margin-top: 3px; }
+    button { font: inherit; }
+    .icon-button { border: 0; background: transparent; color: #9ba3b2; padding: 6px; cursor: pointer; font-size: 17px; }
+    .icon-button:hover { color: #d74646; }
+    .empty { padding: 16px 5px; text-align: center; font-size: 12px; color: #929bad; }
+    .chat { min-height: 650px; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-head { padding: 21px 24px; border-bottom: 1px solid #edf0f5; }
+    .chat-head p { color: #8791a6; font-size: 12px; margin: 5px 0 0; }
+    .messages { flex: 1; padding: 25px; overflow: auto; display: flex; flex-direction: column; gap: 17px; }
+    .welcome { margin: auto; max-width: 380px; text-align: center; color: #8992a5; font-size: 13px; line-height: 1.65; }
+    .welcome .sparkle { font-size: 32px; margin-bottom: 10px; }
+    .welcome strong { display: block; color: #344056; font-size: 16px; margin-bottom: 5px; }
+    .message { max-width: 88%; padding: 13px 15px; border-radius: 13px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+    .message.user { align-self: flex-end; background: #6d5efc; color: white; border-bottom-right-radius: 4px; }
+    .message.assistant { align-self: flex-start; background: #f2f4f8; color: #283348; border-bottom-left-radius: 4px; }
+    .sources { align-self: flex-start; width: min(88%, 570px); display: grid; gap: 7px; }
+    .source { border: 1px solid #e7eaf1; border-radius: 9px; padding: 9px 11px; font-size: 11px; color: #626e84; line-height: 1.5; }
+    .source strong { color: #4f46c8; display: block; margin-bottom: 3px; }
+    .composer { padding: 16px 20px 20px; border-top: 1px solid #edf0f5; }
+    .compose-box { display: flex; gap: 9px; border: 1px solid #dfe4ed; border-radius: 12px; padding: 6px; background: #fff; }
+    .compose-box:focus-within { border-color: #8175ff; box-shadow: 0 0 0 3px #6d5efc15; }
+    textarea { flex: 1; border: 0; outline: 0; resize: none; min-height: 39px; max-height: 120px; padding: 10px 8px; font: inherit; font-size: 13px; color: #263248; }
+    textarea::placeholder { color: #a0a8b7; }
+    .send { align-self: flex-end; border: 0; border-radius: 9px; color: white; background: #6d5efc; font-weight: 600; font-size: 12px; padding: 11px 15px; cursor: pointer; }
+    .send:hover { background: #5849e7; }
+    .send:disabled { opacity: .5; cursor: wait; }
+    .hint { font-size: 10px; color: #9aa2b1; margin: 9px 3px 0; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #20283a; color: white; border-radius: 9px; padding: 11px 16px; font-size: 12px; box-shadow: 0 8px 25px #0002; z-index: 2; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; margin-top: 20px; padding: 0 14px 24px; gap: 14px; } .chat { min-height: 540px; } header { padding: 20px 16px; } .message, .sources { max-width: 96%; width: 96%; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">⌕</div>
+      <div><h1>Motor de Búsqueda y RAG</h1><p>Pregunta a tus documentos con ayuda de IA</p></div>
+    </div>
+  </header>
+  <main>
+    <aside class="card panel">
+      <h2>Tus documentos</h2>
+      <p class="subheading">Carga archivos para indexarlos y utilizarlos como contexto en tus preguntas.</p>
+      <label class="drop-zone" id="drop-zone">
+        <span class="upload-icon" aria-hidden="true">↥</span>
+        <strong>Arrastra tus archivos o haz clic</strong>
+        <span>PDF o TXT · máximo 20 MB</span>
+        <input id="file-input" type="file" accept=".pdf,.txt,application/pdf,text/plain" multiple>
+      </label>
+      <div class="doc-heading"><h3>Archivos indexados</h3><span class="count" id="doc-count">0</span></div>
+      <div class="documents" id="documents"><div class="empty">Aún no hay documentos.</div></div>
+    </aside>
+    <section class="card chat">
+      <div class="chat-head"><h2>Consulta tus archivos</h2><p>Las respuestas usan fragmentos relevantes de tus documentos.</p></div>
+      <div class="messages" id="messages" aria-live="polite">
+        <div class="welcome"><div class="sparkle">✳</div><strong>¿Qué quieres saber?</strong>Sube uno o más documentos y escribe una pregunta. Las fuentes aparecerán debajo de cada respuesta.</div>
+      </div>
+      <form class="composer" id="question-form">
+        <div class="compose-box"><textarea id="question" rows="1" placeholder="Pregunta algo sobre tus documentos…" required></textarea><button class="send" id="send" type="submit">Enviar ↗</button></div>
+        <p class="hint">Enter para enviar · Shift + Enter para nueva línea</p>
+      </form>
+    </section>
+  </main>
+  <script>
+    const documentsEl = document.getElementById("documents");
+    const input = document.getElementById("file-input");
+    const dropZone = document.getElementById("drop-zone");
+    const messages = document.getElementById("messages");
+    const question = document.getElementById("question");
+    const sendButton = document.getElementById("send");
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, options);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Ocurrió un error al comunicarse con el servidor.");
+      return body;
+    }
+
+    function notify(text) {
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = text;
+      document.body.append(toast);
+      setTimeout(() => toast.remove(), 3500);
+    }
+
+    async function refreshDocuments() {
+      try {
+        const items = await api("/api/documents");
+        document.getElementById("doc-count").textContent = items.length;
+        documentsEl.replaceChildren();
+        if (!items.length) {
+          documentsEl.innerHTML = '<div class="empty">Aún no hay documentos.</div>';
+          return;
+        }
+        for (const item of items) {
+          const row = document.createElement("div");
+          row.className = "document";
+          const icon = document.createElement("div");
+          icon.className = "file-icon";
+          icon.textContent = item.name.toLowerCase().endsWith(".pdf") ? "PDF" : "TXT";
+          const info = document.createElement("div");
+          info.className = "doc-info";
+          const name = document.createElement("div");
+          name.className = "doc-name";
+          name.textContent = item.name;
+          const meta = document.createElement("div");
+          meta.className = "doc-meta";
+          meta.textContent = `${item.chunks} fragmentos`;
+          info.append(name, meta);
+          const remove = document.createElement("button");
+          remove.className = "icon-button";
+          remove.type = "button";
+          remove.title = "Eliminar documento";
+          remove.setAttribute("aria-label", `Eliminar ${item.name}`);
+          remove.textContent = "×";
+          remove.addEventListener("click", async () => {
+            try { await api(`/api/documents/${item.id}`, { method: "DELETE" }); await refreshDocuments(); }
+            catch (error) { notify(error.message); }
+          });
+          row.append(icon, info, remove);
+          documentsEl.append(row);
+        }
+      } catch (error) { notify(error.message); }
+    }
+
+    async function uploadFiles(files) {
+      for (const file of files) {
+        const data = new FormData();
+        data.append("file", file);
+        try {
+          const result = await api("/api/upload", { method: "POST", body: data });
+          notify(`${result.name}: ${result.chunks} fragmentos indexados`);
+        } catch (error) { notify(`${file.name}: ${error.message}`); }
+      }
+      input.value = "";
+      await refreshDocuments();
+    }
+
+    input.addEventListener("change", () => uploadFiles(input.files));
+    for (const eventName of ["dragenter", "dragover"]) {
+      dropZone.addEventListener(eventName, (event) => { event.preventDefault(); dropZone.classList.add("dragover"); });
+    }
+    for (const eventName of ["dragleave", "drop"]) {
+      dropZone.addEventListener(eventName, (event) => { event.preventDefault(); dropZone.classList.remove("dragover"); });
+    }
+    dropZone.addEventListener("drop", (event) => uploadFiles(event.dataTransfer.files));
+
+    function addMessage(text, role) {
+      const bubble = document.createElement("div");
+      bubble.className = `message ${role}`;
+      bubble.textContent = text;
+      messages.append(bubble);
+      messages.scrollTop = messages.scrollHeight;
+      return bubble;
+    }
+
+    document.getElementById("question-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const value = question.value.trim();
+      if (!value) return;
+      messages.querySelector(".welcome")?.remove();
+      addMessage(value, "user");
+      question.value = "";
+      sendButton.disabled = true;
+      const loading = addMessage("Buscando en tus documentos…", "assistant");
+      try {
+        const result = await api("/api/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: value })
+        });
+        loading.textContent = result.answer;
+        if (result.sources.length) {
+          const sourceList = document.createElement("div");
+          sourceList.className = "sources";
+          for (const [index, source] of result.sources.entries()) {
+            const card = document.createElement("div");
+            card.className = "source";
+            const title = document.createElement("strong");
+            title.textContent = `[${index + 1}] ${source.name} · fragmento ${source.chunk_index + 1} · relevancia ${Math.round(source.score * 100)}%`;
+            const content = document.createElement("span");
+            content.textContent = source.content.length > 260 ? `${source.content.slice(0, 260)}…` : source.content;
+            card.append(title, content);
+            sourceList.append(card);
+          }
+          messages.append(sourceList);
+        }
+      } catch (error) { loading.textContent = error.message; }
+      finally { sendButton.disabled = false; messages.scrollTop = messages.scrollHeight; question.focus(); }
+    });
+    question.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        document.getElementById("question-form").requestSubmit();
+      }
+    });
+    refreshDocuments();
+  </script>
+</body>
+</html>
